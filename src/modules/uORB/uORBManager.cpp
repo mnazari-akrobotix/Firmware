@@ -188,11 +188,9 @@ orb_advert_t uORB::Manager::orb_advertise_multi(const struct orb_metadata *meta,
 
 #endif /* ORB_USE_PUBLISHER_RULES */
 
-	int result, fd;
-	orb_advert_t advertiser;
 
 	/* open the node as an advertiser */
-	fd = node_open(meta, data, true, instance, priority);
+	int fd = node_open(meta, data, true, instance, priority);
 
 	if (fd == PX4_ERROR) {
 		PX4_ERR("%s advertise failed", meta->o_name);
@@ -202,13 +200,15 @@ orb_advert_t uORB::Manager::orb_advertise_multi(const struct orb_metadata *meta,
 	/* Set the queue size. This must be done before the first publication; thus it fails if
 	 * this is not the first advertiser.
 	 */
-	result = px4_ioctl(fd, ORBIOCSETQUEUESIZE, (unsigned long)queue_size);
+	int result = px4_ioctl(fd, ORBIOCSETQUEUESIZE, (unsigned long)queue_size);
 
 	if (result < 0 && queue_size > 1) {
 		PX4_WARN("orb_advertise_multi: failed to set queue size");
 	}
 
 	/* get the advertiser handle and close the node */
+	orb_advert_t advertiser;
+
 	result = px4_ioctl(fd, ORBIOCGADVERTISER, (unsigned long)&advertiser);
 	px4_close(fd);
 
@@ -358,13 +358,15 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, const void *data, 
 			     int priority)
 {
 	char path[orb_maxpath];
-	int fd = -1, ret;
+	int fd = -1;
+	int ret = -1;
 
 	/*
 	 * If meta is null, the object was not defined, i.e. it is not
 	 * known to the system.  We can't advertise/subscribe such a thing.
 	 */
 	if (nullptr == meta) {
+		PX4_ERR("node_open no meta");
 		errno = ENOENT;
 		return PX4_ERROR;
 	}
@@ -373,6 +375,7 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, const void *data, 
 	 * Advertiser must publish an initial value.
 	 */
 	if (advertiser && (data == nullptr)) {
+		PX4_ERR("node_open data null: %s", meta->o_name);
 		errno = EINVAL;
 		return PX4_ERROR;
 	}
@@ -386,6 +389,7 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, const void *data, 
 		ret = uORB::Utils::node_mkpath(path, meta, instance);
 
 		if (ret != OK) {
+			PX4_ERR("node_mkpath failed: %s", meta->o_name);
 			errno = -ret;
 			return PX4_ERROR;
 		}

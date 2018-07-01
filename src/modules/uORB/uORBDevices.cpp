@@ -71,9 +71,7 @@
 #include <px4_sem.hpp>
 #include <stdlib.h>
 
-using namespace device;
-
-uORB::DeviceNode::SubscriberData *uORB::DeviceNode::filp_to_sd(device::file_t *filp)
+uORB::DeviceNode::SubscriberData *uORB::DeviceNode::filp_to_sd(cdev::file_t *filp)
 {
 #ifndef __PX4_NUTTX
 
@@ -85,9 +83,8 @@ uORB::DeviceNode::SubscriberData *uORB::DeviceNode::filp_to_sd(device::file_t *f
 	return (SubscriberData *)(FILE_PRIV(filp));
 }
 
-uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, const char *name, const char *path,
-			     int priority, unsigned int queue_size) :
-	CDev(name, path),
+uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, const char *path, int priority, unsigned int queue_size) :
+	CDev(path),
 	_meta(meta),
 	_priority((uint8_t)priority),
 	_queue_size(queue_size)
@@ -103,7 +100,7 @@ uORB::DeviceNode::~DeviceNode()
 }
 
 int
-uORB::DeviceNode::open(device::file_t *filp)
+uORB::DeviceNode::open(cdev::file_t *filp)
 {
 	int ret;
 
@@ -182,7 +179,7 @@ uORB::DeviceNode::open(device::file_t *filp)
 }
 
 int
-uORB::DeviceNode::close(device::file_t *filp)
+uORB::DeviceNode::close(cdev::file_t *filp)
 {
 	/* is this the publisher closing? */
 	if (px4_getpid() == _publisher) {
@@ -209,7 +206,7 @@ uORB::DeviceNode::close(device::file_t *filp)
 }
 
 ssize_t
-uORB::DeviceNode::read(device::file_t *filp, char *buffer, size_t buflen)
+uORB::DeviceNode::read(cdev::file_t *filp, char *buffer, size_t buflen)
 {
 	SubscriberData *sd = (SubscriberData *)filp_to_sd(filp);
 
@@ -265,7 +262,7 @@ uORB::DeviceNode::read(device::file_t *filp, char *buffer, size_t buflen)
 }
 
 ssize_t
-uORB::DeviceNode::write(device::file_t *filp, const char *buffer, size_t buflen)
+uORB::DeviceNode::write(cdev::file_t *filp, const char *buffer, size_t buflen)
 {
 	/*
 	 * Writes are legal from interrupt context as long as the
@@ -333,7 +330,7 @@ uORB::DeviceNode::write(device::file_t *filp, const char *buffer, size_t buflen)
 }
 
 int
-uORB::DeviceNode::ioctl(device::file_t *filp, int cmd, unsigned long arg)
+uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	SubscriberData *sd = filp_to_sd(filp);
 
@@ -525,7 +522,7 @@ int16_t uORB::DeviceNode::topic_unadvertised(const orb_metadata *meta, int prior
 #endif /* ORB_COMMUNICATOR */
 
 pollevent_t
-uORB::DeviceNode::poll_state(device::file_t *filp)
+uORB::DeviceNode::poll_state(cdev::file_t *filp)
 {
 	SubscriberData *sd = filp_to_sd(filp);
 
@@ -542,7 +539,7 @@ uORB::DeviceNode::poll_state(device::file_t *filp)
 void
 uORB::DeviceNode::poll_notify_one(px4_pollfd_struct_t *fds, pollevent_t events)
 {
-	SubscriberData *sd = filp_to_sd((device::file_t *)fds->priv);
+	SubscriberData *sd = filp_to_sd((cdev::file_t *)fds->priv);
 
 	/*
 	 * If the topic looks updated to the subscriber, go ahead and notify them.
@@ -830,13 +827,13 @@ int uORB::DeviceNode::update_queue_size(unsigned int queue_size)
 }
 
 uORB::DeviceMaster::DeviceMaster() :
-	CDev("obj_master", TOPIC_MASTER_DEVICE_PATH)
+	CDev(TOPIC_MASTER_DEVICE_PATH)
 {
 	_last_statistics_output = hrt_absolute_time();
 }
 
 int
-uORB::DeviceMaster::ioctl(device::file_t *filp, int cmd, unsigned long arg)
+uORB::DeviceMaster::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	int ret;
 
@@ -880,8 +877,6 @@ uORB::DeviceMaster::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 					*(adv->instance) = group_tries;
 				}
 
-				const char *objname = meta->o_name; //no need for a copy, meta->o_name will never be freed or changed
-
 				/* driver wants a permanent copy of the path, so make one here */
 				const char *devpath = strdup(nodepath);
 
@@ -890,7 +885,7 @@ uORB::DeviceMaster::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 				}
 
 				/* construct the new node */
-				uORB::DeviceNode *node = new uORB::DeviceNode(meta, objname, devpath, adv->priority);
+				uORB::DeviceNode *node = new uORB::DeviceNode(meta, devpath, adv->priority);
 
 				/* if we didn't get a device, that's bad */
 				if (node == nullptr) {

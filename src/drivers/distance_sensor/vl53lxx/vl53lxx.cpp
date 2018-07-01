@@ -136,7 +136,7 @@ protected:
 
 private:
 	uint8_t _rotation;
-	work_s _work;
+	work_s _work{};
 	ringbuffer::RingBuffer *_reports;
 	bool _sensor_ok;
 	int _measure_ticks;
@@ -218,12 +218,6 @@ VL53LXX::VL53LXX(uint8_t rotation, int bus, int address) :
 {
 	// up the retries since the device misses the first measure attempts
 	I2C::_retries = 3;
-
-	// enable debug() calls
-	_debug_enabled = false;
-
-	// work_cancel in the dtor will explode if we don't do this...
-	memset(&_work, 0, sizeof(_work));
 }
 
 VL53LXX::~VL53LXX()
@@ -477,7 +471,7 @@ VL53LXX::readRegister(uint8_t reg_address, uint8_t &value)
 	ret = transfer(&reg_address, sizeof(reg_address), nullptr, 0);
 
 	if (OK != ret) {
-		DEVICE_LOG("i2c::transfer returned %d", ret);
+		PX4_DEBUG("i2c::transfer returned %d", ret);
 		perf_count(_comms_errors);
 		return ret;
 	}
@@ -486,7 +480,7 @@ VL53LXX::readRegister(uint8_t reg_address, uint8_t &value)
 	ret = transfer(nullptr, 0, &value, 1);
 
 	if (OK != ret) {
-		DEVICE_LOG("error reading from sensor: %d", ret);
+		PX4_DEBUG("error reading from sensor: %d", ret);
 		perf_count(_comms_errors);
 		return ret;
 	}
